@@ -70,9 +70,9 @@ export default function StudentLogin() {
           <Link href="/warden/login" className="btn-outline w-full text-center">
             Warden Login
           </Link>
-          <Link href="/admin/login" className="text-center text-xs text-gray-400 hover:text-gray-600 mt-1">
+          {/* <Link href="/admin/login" className="text-center text-xs text-gray-400 hover:text-gray-600 mt-1">
             Admin Login
-          </Link>
+          </Link> */}
         </div>
       </div>
     </div>
