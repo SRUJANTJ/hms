@@ -78,4 +78,8 @@ async function handler(req, res) {
   res.status(405).end();
 }
 
-export default withAuth(handler, ["admin"]);
+// Admin: full access (list + create).
+// Warden: create only ("Add new student" is optional/permission-based
+// for wardens per the role matrix) - the warden UI never calls GET on
+// this route, it uses /api/warden/students for listing instead.
+export default withAuth(handler, ["admin", "warden"]);
