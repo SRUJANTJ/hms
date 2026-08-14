@@ -24,22 +24,23 @@ import {
 } from 'lucide-react';
 
 const emptyForm = {
-  name: '',
-  email: '',
-  phone: '',
-  password: '',
-  roll_number: '',
-  course: '',
-  year: '',
-  gender: '',
-  dob: '',
-  address: '',
-  guardian_name: '',
-  guardian_phone: '',
-  emergency_contact: '',
-  room_id: '',
-  image: '',
-  id_proof: '',
+    name:"",
+    email:"",
+    phone:"",
+    password:"",
+    roll_number:"",
+    course:"",
+    year:"",
+    gender:"",
+    dob:"",
+    address:"",
+    guardian_name:"",
+    guardian_phone:"",
+    emergency_contact:"",
+    hostel_id:"",
+    room_id:"",
+    image:"",
+    id_proof:"",
 };
 
 export default function AdminStudents() {
@@ -50,7 +51,7 @@ export default function AdminStudents() {
 
   const [students, setStudents] = useState([]);
   const [rooms, setRooms] = useState([]);
-
+const [hostels, setHostels] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -168,14 +169,21 @@ export default function AdminStudents() {
     );
   };
 
-  const getRoomBlock = (room) => {
-    return getText(room.block || room.block_name);
-  };
+const getRoomBlock = (room) => {
+  return getText(room.block || room.block_name);
+};
 
-  const getRoomOccupied = (room) => {
-    return Number(room.occupied || 0);
-  };
+const getHostelName = (hostelId) => {
+  const hostel = hostels.find(
+    (h) => Number(h.id) === Number(hostelId)
+  );
 
+  return hostel?.name || "";
+};
+
+const getRoomOccupied = (room) => {
+  return Number(room.occupied || 0);
+};
   const getRoomCapacity = (room) => {
     return Number(room.capacity || 0);
   };
@@ -217,11 +225,17 @@ export default function AdminStudents() {
         Array.isArray(studentsData) ? studentsData : []
       );
 
-      setRooms(
-        Array.isArray(metaData?.rooms)
-          ? metaData.rooms
-          : []
-      );
+   setRooms(
+  Array.isArray(metaData.rooms)
+    ? metaData.rooms
+    : []
+);
+
+setHostels(
+  Array.isArray(metaData.hostels)
+    ? metaData.hostels
+    : []
+);
     } catch (error) {
       console.error('Error loading admin data:', error);
       setErr(error.message || 'Failed to load students');
@@ -448,12 +462,13 @@ export default function AdminStudents() {
   const openEdit = (student) => {
     setEditing(student);
 
-    setForm({
-      ...emptyForm,
-      ...student,
-      room_id: getStudentRoomId(student),
-      password: '',
-    });
+setForm({
+    ...emptyForm,
+    ...student,
+    hostel_id: student.hostel_id || "",
+    room_id: getStudentRoomId(student),
+    password: ""
+});
 
     setErr('');
     setModalOpen(true);
@@ -554,6 +569,9 @@ export default function AdminStudents() {
     3. Uses checkout:true when Unassigned is selected.
     4. Reloads the server data after success.
     5. Restores the old room if the API request fails.
+
+    Note: hostel_id is derived server-side from the room row
+    inside allocate.js — the client never sends hostel_id.
   */
   const handleAllocate = async (student, selectedRoomId) => {
     const studentId = getStudentId(student);
@@ -703,6 +721,8 @@ export default function AdminStudents() {
     setImportErr('');
 
     try {
+      // Note: bulk-import.js derives hostel_id server-side from
+      // each row's room_id — the client only ever sends room_id.
       const response = await apiFetch('/api/admin/students/bulk-import', {
         method: 'POST',
         body: JSON.stringify({ rows: importRows }),
@@ -1006,17 +1026,18 @@ export default function AdminStudents() {
         {/* Students table */}
         <div className="table-wrap overflow-x-auto">
           <table className="data min-w-[1050px]">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Roll No</th>
-                <th>Course</th>
-                <th>Room</th>
-                <th>Status</th>
-                <th>Contact</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
+          <thead>
+<tr>
+  <th>Student</th>
+  <th>Roll No</th>
+  <th>Course</th>
+  <th>Hostel</th>
+  <th>Room</th>
+  <th>Status</th>
+  <th>Contact</th>
+  <th className="text-right">Actions</th>
+</tr>
+</thead>
 
             <tbody>
               {filteredStudents.map((student, rowIndex) => {
@@ -1068,6 +1089,9 @@ export default function AdminStudents() {
                       {student.course || '—'}
                     </td>
 
+<td>
+    {getHostelName(student.hostel_id) || "—"}
+</td>
                     <td>
                       <select
                         className="input py-1 text-xs"
@@ -1084,7 +1108,13 @@ export default function AdminStudents() {
                           Unassigned
                         </option>
 
-                        {rooms.map((room) => {
+                        {rooms
+.filter(room => {
+    if (!form.hostel_id) return true;
+
+    return Number(room.hostel_id) === Number(form.hostel_id);
+})
+.map(room => {
                           const roomId = getRoomId(room);
                           const occupied =
                             getRoomOccupied(room);
@@ -1269,20 +1299,22 @@ export default function AdminStudents() {
               />
             </div>
 
-            {!editing && (
-              <div>
-                <label className="label">Password</label>
+            <div>
+              <label className="label">
+                {editing ? 'New Password (optional)' : 'Password'}
+              </label>
 
-                <input
-                  required
-                  name="password"
-                  type="password"
-                  className="input"
-                  value={form.password}
-                  onChange={handleInputChange}
-                />
-              </div>
-            )}
+              <input
+                required={!editing}
+                type="password"
+                name="password"
+                autoComplete="new-password"
+                className="input"
+                placeholder={editing ? 'Leave blank to keep current' : ''}
+                value={form.password}
+                onChange={handleInputChange}
+              />
+            </div>
 
             <div>
               <label className="label">Course</label>
@@ -1373,48 +1405,73 @@ export default function AdminStudents() {
               />
             </div>
 
-            {!editing && (
-              <div>
-                <label className="label">
-                  Initial Room
-                </label>
+          <div>
+  <label className="label">Hostel</label>
 
-                <select
-                  name="room_id"
-                  className="input"
-                  value={form.room_id}
-                  onChange={handleInputChange}
-                >
-                  <option value="">Unassigned</option>
+  <select
+    name="hostel_id"
+    className="input"
+    value={form.hostel_id || ""}
+    onChange={(e) =>
+      setForm((prev) => ({
+        ...prev,
+        hostel_id: e.target.value,
+        room_id: "",
+      }))
+    }
+  >
+    <option value="">Select Hostel</option>
 
-                  {rooms.map((room) => {
-                    const roomId = getRoomId(room);
-                    const occupied =
-                      getRoomOccupied(room);
-                    const capacity =
-                      getRoomCapacity(room);
-                    const isFull =
-                      capacity > 0 &&
-                      occupied >= capacity;
+    {hostels.map((hostel) => (
+      <option key={hostel.id} value={hostel.id}>
+        {hostel.name}
+      </option>
+    ))}
+  </select>
+</div>
 
-                    return (
-                      <option
-                        key={roomId}
-                        value={roomId}
-                        disabled={isFull}
-                      >
-                        {getRoomBlock(room)
-                          ? `${getRoomBlock(room)} - `
-                          : ''}
-                        {getRoomNumber(room)} ({occupied}/
-                        {capacity})
-                        {isFull ? ' - Full' : ''}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
+<div>
+  <label className="label">
+    {editing ? "Room" : "Initial Room"}
+  </label>
+
+  <select
+    name="room_id"
+    className="input"
+    value={form.room_id}
+    onChange={handleInputChange}
+  >
+    <option value="">Unassigned</option>
+
+    {rooms
+      .filter(
+        (room) =>
+          !form.hostel_id ||
+          Number(room.hostel_id) === Number(form.hostel_id)
+      )
+      .map((room) => {
+        const roomId = getRoomId(room);
+        const occupied = getRoomOccupied(room);
+        const capacity = getRoomCapacity(room);
+
+        const isFull =
+          capacity > 0 &&
+          occupied >= capacity &&
+          roomId !== form.room_id;
+
+        return (
+          <option
+            key={roomId}
+            value={roomId}
+            disabled={isFull}
+          >
+            {getRoomNumber(room)} ({occupied}/{capacity})
+            {isFull ? " - Full" : ""}
+          </option>
+        );
+      })}
+  </select>
+</div>
           </div>
 
           <div>

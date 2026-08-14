@@ -63,10 +63,11 @@ async function handler(req, res) {
       await client.query("BEGIN");
 
       let room_id = null;
+      let hostel_id = null;
 
       if (room_number) {
         const roomLookup = await client.query(
-          `SELECT id, capacity, occupied FROM rooms
+          `SELECT id, hostel_id, capacity, occupied FROM rooms
              WHERE lower(room_number) = lower($1)
                AND ($2 = '' OR lower(block) = lower($2))
              ORDER BY id LIMIT 1 FOR UPDATE`,
@@ -90,6 +91,7 @@ async function handler(req, res) {
         }
 
         room_id = room.id;
+        hostel_id = room.hostel_id;
       }
 
       const hash = await bcrypt.hash(password, 10);
@@ -104,11 +106,11 @@ async function handler(req, res) {
       await client.query(
         `INSERT INTO students
           (user_id, roll_number, course, year, gender, dob, address, guardian_name,
-           guardian_phone, emergency_contact, room_id, check_in_date)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+           guardian_phone, emergency_contact, room_id, hostel_id, check_in_date)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
         [
           userId, roll_number, course, year, gender, dob || null, address,
-          guardian_name, guardian_phone, emergency_contact, room_id,
+          guardian_name, guardian_phone, emergency_contact, room_id, hostel_id,
           new Date().toISOString().slice(0, 10),
         ]
       );

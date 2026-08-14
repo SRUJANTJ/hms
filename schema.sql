@@ -19,6 +19,18 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
+-- ========== LOGIN RATE LIMITING ==========
+-- Tracks failed login attempts per (IP + email + role) so brute-forcing
+-- a single account's password gets locked out for a cooldown period.
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id               SERIAL PRIMARY KEY,
+  identifier       TEXT UNIQUE NOT NULL,   -- e.g. "1.2.3.4:jane@x.com:student"
+  attempts         INT NOT NULL DEFAULT 0,
+  first_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  locked_until     TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier ON login_attempts(identifier);
+
 -- ========== HOSTELS / BLOCKS ==========
 CREATE TABLE IF NOT EXISTS hostels (
   id          SERIAL PRIMARY KEY,
@@ -50,23 +62,24 @@ CREATE TABLE IF NOT EXISTS students (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   roll_number        VARCHAR(50) UNIQUE,
-  course              VARCHAR(100),
-  year                VARCHAR(20),
-  gender              VARCHAR(10),
-  dob                 DATE,
-  address             TEXT,
-  guardian_name       VARCHAR(150),
-  guardian_phone      VARCHAR(20),
-  emergency_contact   VARCHAR(20),
-  id_proof            TEXT,          -- base64 data-url
-  room_id             INT REFERENCES rooms(id) ON DELETE SET NULL,
-  hostel_id           INT REFERENCES hostels(id) ON DELETE SET NULL,
-  check_in_date       DATE,
-  check_out_date      DATE,
-  status              VARCHAR(20) DEFAULT 'Active' CHECK (status IN ('Active','CheckedOut','Suspended')),
-  created_at          TIMESTAMPTZ DEFAULT now()
+  course             VARCHAR(100),
+  year               VARCHAR(20),
+  gender             VARCHAR(10),
+  dob                DATE,
+  address            TEXT,
+  guardian_name      VARCHAR(150),
+  guardian_phone     VARCHAR(20),
+  emergency_contact  VARCHAR(20),
+  id_proof           TEXT,
+  room_id            INT REFERENCES rooms(id) ON DELETE SET NULL,
+  hostel_id          INT REFERENCES hostels(id) ON DELETE SET NULL,
+  hostel_name        VARCHAR(150),      -- NEW COLUMN
+  check_in_date      DATE,
+  check_out_date     DATE,
+  status             VARCHAR(20) DEFAULT 'Active'
+      CHECK (status IN ('Active','CheckedOut','Suspended')),
+  created_at         TIMESTAMPTZ DEFAULT now()
 );
-
 -- ========== STAFF (warden/security/housekeeping profile) ==========
 CREATE TABLE IF NOT EXISTS staff (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -77,6 +90,27 @@ CREATE TABLE IF NOT EXISTS staff (
   joined_date   DATE DEFAULT now(),
   created_at    TIMESTAMPTZ DEFAULT now()
 );
+
+-- ========== STAFF <-> HOSTEL/BLOCK ASSIGNMENTS (many-to-many) ==========
+-- A warden/staff member can be made responsible for one or more
+-- hostel blocks/buildings. `staff.hostel_id` above is kept as a
+-- "primary" block for backward compatibility, but the full set of
+-- blocks a staff member is responsible for lives here.
+CREATE TABLE IF NOT EXISTS staff_hostels (
+  id          SERIAL PRIMARY KEY,
+  staff_id    UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  hostel_id   INT NOT NULL REFERENCES hostels(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (staff_id, hostel_id)
+);
+CREATE INDEX IF NOT EXISTS idx_staff_hostels_staff ON staff_hostels(staff_id);
+CREATE INDEX IF NOT EXISTS idx_staff_hostels_hostel ON staff_hostels(hostel_id);
+
+-- Backfill: anyone who already had a single hostel_id gets that
+-- carried over into the new many-to-many table. Safe to re-run.
+INSERT INTO staff_hostels (staff_id, hostel_id)
+SELECT id, hostel_id FROM staff WHERE hostel_id IS NOT NULL
+ON CONFLICT (staff_id, hostel_id) DO NOTHING;
 
 -- ========== FEES ==========
 CREATE TABLE IF NOT EXISTS fees (

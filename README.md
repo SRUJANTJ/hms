@@ -60,6 +60,16 @@ Run the SQL in `schema.sql` against your Neon database. Easiest way — paste it
 psql "$DATABASE_URL" -f schema.sql
 ```
 
+**Already have an existing database?** `schema.sql` now includes a `staff_hostels`
+table (lets one warden/staff member be assigned to multiple hostel blocks/buildings)
+and a `login_attempts` table (login rate limiting). Instead of re-running the
+whole file, just run the one-off migrations:
+```bash
+psql "$DATABASE_URL" -f migrations/001_staff_hostels.sql
+psql "$DATABASE_URL" -f migrations/002_login_attempts.sql
+```
+Both are idempotent and safe to run even if you're not sure whether you already have them.
+
 ### 5. Create your admin account
 ```bash
 npm run seed

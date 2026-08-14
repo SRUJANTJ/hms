@@ -29,7 +29,7 @@ async function handler(req, res) {
 
     if (checkout) {
       await client.query(
-        "UPDATE students SET room_id = NULL, status = 'CheckedOut', check_out_date = CURRENT_DATE WHERE id = $1",
+        "UPDATE students SET room_id = NULL, hostel_id = NULL, hostel_name = NULL,  status = 'CheckedOut', check_out_date = CURRENT_DATE WHERE id = $1",
         [id]
       );
       await client.query("COMMIT");
@@ -41,7 +41,21 @@ async function handler(req, res) {
       return res.status(400).json({ error: "room_id is required" });
     }
 
-    const roomResult = await client.query("SELECT capacity, occupied FROM rooms WHERE id = $1 FOR UPDATE", [room_id]);
+    const roomResult = await client.query(
+      `
+  SELECT
+      r.hostel_id,
+      h.name AS hostel_name,
+      r.capacity,
+      r.occupied
+  FROM rooms r
+  JOIN hostels h
+      ON h.id = r.hostel_id
+  WHERE r.id = $1
+  FOR UPDATE
+  `,
+      [room_id]
+    );
     if (roomResult.rowCount === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Room not found" });
@@ -52,9 +66,25 @@ async function handler(req, res) {
       return res.status(400).json({ error: "Room is already full" });
     }
 
+    // hostel_id always comes from the room being assigned, never from
+    // the request body, so a student's hostel_id can't drift from the
+    // hostel their actual room belongs to.
     await client.query(
-      "UPDATE students SET room_id = $1, status = 'Active' WHERE id = $2",
-      [room_id, id]
+      `
+  UPDATE students
+  SET
+      room_id = $1,
+      hostel_id = $2,
+      hostel_name = $3,
+      status = 'Active'
+  WHERE id = $4
+  `,
+      [
+        room_id,
+        room.hostel_id,
+        room.hostel_name,
+        id
+      ]
     );
     await client.query(
       `UPDATE rooms SET occupied = occupied + 1, status = CASE WHEN occupied + 1 >= capacity THEN 'Full' ELSE status END

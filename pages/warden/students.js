@@ -15,8 +15,8 @@ import {
   UserPlus,
   CheckCircle2,
   XCircle,
+  Building2,
 } from 'lucide-react';
-
 
 const emptyForm = {
   name: '',
@@ -36,16 +36,13 @@ const emptyForm = {
   image: '',
 };
 
-
 export default function WardenStudents() {
-  const { user, loading } = useAuthGuard(
-    ['warden'],
-    '/warden/login'
-  );
-
+  const { user, loading } = useAuthGuard(['warden'], '/warden/login');
 
   const [students, setStudents] = useState([]);
   const [rooms, setRooms] = useState([]);
+  const [myHostels, setMyHostels] = useState([]); // hostel blocks/buildings this warden is responsible for
+  const [hostelScope, setHostelScope] = useState('all'); // 'all' or a specific hostel id
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [courseFilter, setCourseFilter] = useState('all');
@@ -56,13 +53,11 @@ export default function WardenStudents() {
   const [refreshing, setRefreshing] = useState(false);
   const [allocationId, setAllocationId] = useState(null);
 
-
   // Add-student modal (Add only - no edit/delete for warden)
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState('');
-
 
   // Bulk excel import
   const [importOpen, setImportOpen] = useState(false);
@@ -73,35 +68,52 @@ export default function WardenStudents() {
   const [importErr, setImportErr] = useState('');
   const fileInputRef = useRef(null);
 
-
-  const fetchAll = async () => {
+  const fetchAll = async (scopeOverride) => {
     try {
       setErr('');
 
+      // The admin is the source of truth for which hostel block(s)/building(s)
+      // this warden manages - the backend derives it from the logged-in
+      // user, never from anything the client sends. `hostel_id` here is
+      // only used to narrow down to a single block when the warden manages
+      // more than one and has picked one from the switcher below.
+      const scope = scopeOverride ?? hostelScope;
+      const studentsUrl =
+        scope && scope !== 'all'
+          ? `/api/warden/students?hostel_id=${encodeURIComponent(scope)}`
+          : '/api/warden/students';
 
-      const [studentsData, metaData] = await Promise.all([
-        apiFetch('/api/warden/students'),
+      const [studentsData, metaData, hostelsData] = await Promise.all([
+        apiFetch(studentsUrl),
         apiFetch('/api/admin/meta'),
+        apiFetch('/api/warden/my-hostels'),
       ]);
-
 
       setStudents(Array.isArray(studentsData) ? studentsData : []);
       setRooms(Array.isArray(metaData?.rooms) ? metaData.rooms : []);
+      setMyHostels(Array.isArray(hostelsData?.hostels) ? hostelsData.hostels : []);
     } catch (error) {
       console.error('Error loading students:', error);
       setErr(error.message || 'Failed to load students');
       setStudents([]);
       setRooms([]);
+      setMyHostels([]);
     }
   };
-
 
   useEffect(() => {
     if (user) {
       fetchAll();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const handleHostelScopeChange = async (nextScope) => {
+    setHostelScope(nextScope);
+    setRefreshing(true);
+    await fetchAll(nextScope);
+    setRefreshing(false);
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -109,22 +121,18 @@ export default function WardenStudents() {
     setRefreshing(false);
   };
 
-
   /*
     Safely convert any value into text.
-  */
+   */
   const getText = (value) => {
     if (value === null || value === undefined) {
       return '';
     }
 
-
     return String(value).trim();
   };
 
-
   const getStudentId = (student) => student.id || student._id;
-
 
   const getStudentDate = (student) => {
     const dateValue =
@@ -139,31 +147,23 @@ export default function WardenStudents() {
       student.updated_at ||
       student.updatedAt;
 
-
     if (!dateValue) {
       return 0;
     }
 
-
     const timestamp = new Date(dateValue).getTime();
-
 
     return Number.isNaN(timestamp) ? 0 : timestamp;
   };
 
-
   const getStudentName = (student) => getText(student.name).toLowerCase();
-
 
   const getRollNumber = (student) =>
     getText(student.roll_number || student.rollNumber).toLowerCase();
 
-
   const getCourse = (student) => getText(student.course);
 
-
   const getStatus = (student) => getText(student.status) || 'Unknown';
-
 
   const getStudentRoomId = (student) => {
     if (student.room_id) return String(student.room_id);
@@ -172,13 +172,10 @@ export default function WardenStudents() {
     return '';
   };
 
-
   const getBlock = (student) => getText(student.block);
-
 
   const getRoomNumber = (student) =>
     getText(student.room_number || student.roomNumber);
-
 
   const getRoomId = (room) => String(room.id || room._id || '');
   const getRoomLabel = (room) => getText(room.room_number || room.roomNumber || room.number);
@@ -186,11 +183,9 @@ export default function WardenStudents() {
   const getRoomOccupied = (room) => Number(room.occupied || 0);
   const getRoomCapacity = (room) => Number(room.capacity || 0);
 
-
   const statuses = useMemo(() => {
     return [...new Set(students.map((student) => getStatus(student)).filter(Boolean))].sort();
   }, [students]);
-
 
   const courses = useMemo(() => {
     return [
@@ -198,17 +193,14 @@ export default function WardenStudents() {
     ].sort((a, b) => a.localeCompare(b));
   }, [students]);
 
-
   const blocks = useMemo(() => {
     return [
       ...new Set(students.map((student) => getBlock(student)).filter(Boolean)),
     ].sort((a, b) => a.localeCompare(b));
   }, [students]);
 
-
   const filteredStudents = useMemo(() => {
     const query = search.trim().toLowerCase();
-
 
     const result = students.filter((student) => {
       const name = getStudentName(student);
@@ -220,7 +212,6 @@ export default function WardenStudents() {
       const roomNumber = getRoomNumber(student).toLowerCase();
       const status = getStatus(student).toLowerCase();
 
-
       const matchesSearch =
         !query ||
         name.includes(query) ||
@@ -231,11 +222,9 @@ export default function WardenStudents() {
         block.includes(query) ||
         roomNumber.includes(query);
 
-
       const matchesStatus = statusFilter === 'all' || getStatus(student) === statusFilter;
       const matchesCourse = courseFilter === 'all' || getCourse(student) === courseFilter;
       const matchesBlock = blockFilter === 'all' || getBlock(student) === blockFilter;
-
 
       const hasRoom = Boolean(getRoomNumber(student));
       const matchesRoom =
@@ -243,10 +232,8 @@ export default function WardenStudents() {
         (roomFilter === 'assigned' && hasRoom) ||
         (roomFilter === 'unassigned' && !hasRoom);
 
-
       return matchesSearch && matchesStatus && matchesCourse && matchesBlock && matchesRoom;
     });
-
 
     return [...result].sort((first, second) => {
       switch (sortBy) {
@@ -271,7 +258,6 @@ export default function WardenStudents() {
     });
   }, [students, search, statusFilter, courseFilter, blockFilter, roomFilter, sortBy]);
 
-
   const clearFilters = () => {
     setSearch('');
     setStatusFilter('all');
@@ -281,9 +267,7 @@ export default function WardenStudents() {
     setSortBy('latest');
   };
 
-
   /* ---------------- Add student (warden: add only) ---------------- */
-
 
   const openAdd = () => {
     setForm({ ...emptyForm });
@@ -291,12 +275,10 @@ export default function WardenStudents() {
     setModalOpen(true);
   };
 
-
   const handleInputChange = (event) => {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
   };
-
 
   const handleImage = async (event) => {
     const file = event.target.files?.[0];
@@ -309,19 +291,18 @@ export default function WardenStudents() {
     }
   };
 
-
   const handleSave = async (event) => {
     event.preventDefault();
     setSaving(true);
     setFormErr('');
 
-
     try {
+      // Optionally, you can force hostel_id here if your API supports it:
+      // const payload = { ...form, hostel_id: user.hostel_id };
       await apiFetch('/api/admin/students', {
         method: 'POST',
         body: JSON.stringify(form),
       });
-
 
       setModalOpen(false);
       await fetchAll();
@@ -333,27 +314,21 @@ export default function WardenStudents() {
     }
   };
 
-
   /* ---------------- Room assignment / check-out ---------------- */
-
 
   const handleAllocate = async (student, selectedRoomId) => {
     const studentId = getStudentId(student);
     const newRoomId = String(selectedRoomId || '');
-
 
     if (!studentId) {
       setErr('Student ID is missing');
       return;
     }
 
-
     setAllocationId(studentId);
     setErr('');
 
-
     const previousStudents = students;
-
 
     setStudents((current) =>
       current.map((item) =>
@@ -362,7 +337,6 @@ export default function WardenStudents() {
           : item
       )
     );
-
 
     try {
       if (newRoomId) {
@@ -377,7 +351,6 @@ export default function WardenStudents() {
         });
       }
 
-
       await fetchAll();
     } catch (error) {
       console.error('Error allocating room:', error);
@@ -388,25 +361,20 @@ export default function WardenStudents() {
     }
   };
 
-
   const handleCheckout = async (student) => {
     const studentId = getStudentId(student);
     if (!studentId) return;
 
-
     if (!window.confirm(`Check out ${student.name}?`)) return;
-
 
     setAllocationId(studentId);
     setErr('');
-
 
     try {
       await apiFetch(`/api/admin/students/${studentId}/allocate`, {
         method: 'POST',
         body: JSON.stringify({ checkout: true, room_id: null }),
       });
-
 
       await fetchAll();
     } catch (error) {
@@ -417,28 +385,23 @@ export default function WardenStudents() {
     }
   };
 
-
   /* ---------------- Bulk excel import / export ---------------- */
-
 
   const openImport = () => {
     setImportRows([]);
-    setImportFileName('');
     setImportResults(null);
     setImportErr('');
+    setImportFileName('');
     setImportOpen(true);
   };
-
 
   const handleImportFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-
     setImportErr('');
     setImportResults(null);
     setImportFileName(file.name);
-
 
     try {
       const rows = await parseStudentsFile(file);
@@ -455,21 +418,17 @@ export default function WardenStudents() {
     }
   };
 
-
   const runImport = async () => {
     if (importRows.length === 0) return;
 
-
     setImporting(true);
     setImportErr('');
-
 
     try {
       const response = await apiFetch('/api/admin/students/bulk-import', {
         method: 'POST',
         body: JSON.stringify({ rows: importRows }),
       });
-
 
       setImportResults(response);
       await fetchAll();
@@ -481,11 +440,9 @@ export default function WardenStudents() {
     }
   };
 
-
   const handleExport = () => {
     exportStudentsToExcel(filteredStudents, 'warden_students_export.xlsx');
   };
-
 
   const getStatusColor = (status) => {
     if (status === 'Active') return 'green';
@@ -493,11 +450,9 @@ export default function WardenStudents() {
     return 'red';
   };
 
-
   if (loading || !user) {
     return <FullscreenLoader />;
   }
-
 
   return (
     <PortalLayout role="warden" user={user} links={WARDEN_LINKS} title="Students">
@@ -511,7 +466,6 @@ export default function WardenStudents() {
             </p>
           </div>
 
-
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -522,7 +476,6 @@ export default function WardenStudents() {
               {refreshing ? 'Refreshing...' : 'Refresh'}
             </button>
 
-
             <button
               type="button"
               onClick={handleExport}
@@ -531,7 +484,6 @@ export default function WardenStudents() {
               <FileDown size={16} /> Export
             </button>
 
-
             <button
               type="button"
               onClick={openImport}
@@ -539,7 +491,6 @@ export default function WardenStudents() {
             >
               <FileUp size={16} /> Import
             </button>
-
 
             <button
               type="button"
@@ -551,6 +502,52 @@ export default function WardenStudents() {
           </div>
         </div>
 
+        {/* My blocks / buildings - which hostel(s) this warden is responsible for */}
+        {myHostels.length === 0 ? (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-700 animate-fade-in-up">
+            <Building2 size={18} className="mt-0.5 shrink-0" />
+            <p>
+              You haven't been assigned to any hostel block yet. Ask an admin to assign you
+              to a block under <span className="font-medium">Staff &amp; Wardens</span> — once
+              assigned, that block's students will show up here.
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <Building2 size={14} /> My Block{myHostels.length > 1 ? 's' : ''}
+            </span>
+
+            {myHostels.length > 1 && (
+              <button
+                type="button"
+                onClick={() => handleHostelScopeChange('all')}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  hostelScope === 'all'
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                All my blocks
+              </button>
+            )}
+
+            {myHostels.map((h) => (
+              <button
+                key={h.id}
+                type="button"
+                onClick={() => handleHostelScopeChange(String(h.id))}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  hostelScope === String(h.id)
+                    ? 'bg-emerald-700 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {h.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Filters */}
         <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
@@ -569,7 +566,6 @@ export default function WardenStudents() {
               />
             </div>
 
-
             <div>
               <label htmlFor="student-status" className="mb-1 block text-xs font-medium text-gray-500">
                 Status
@@ -587,7 +583,6 @@ export default function WardenStudents() {
               </select>
             </div>
 
-
             <div>
               <label htmlFor="student-course" className="mb-1 block text-xs font-medium text-gray-500">
                 Course
@@ -604,7 +599,6 @@ export default function WardenStudents() {
                 ))}
               </select>
             </div>
-
 
             <div>
               <label htmlFor="student-sort" className="mb-1 block text-xs font-medium text-gray-500">
@@ -627,7 +621,6 @@ export default function WardenStudents() {
               </select>
             </div>
 
-
             <div>
               <label htmlFor="student-block" className="mb-1 block text-xs font-medium text-gray-500">
                 Block
@@ -645,7 +638,6 @@ export default function WardenStudents() {
               </select>
             </div>
 
-
             <div>
               <label htmlFor="student-room" className="mb-1 block text-xs font-medium text-gray-500">
                 Room assignment
@@ -662,7 +654,6 @@ export default function WardenStudents() {
               </select>
             </div>
 
-
             <div className="flex items-end">
               <button
                 type="button"
@@ -675,13 +666,11 @@ export default function WardenStudents() {
           </div>
         </div>
 
-
         {err && (
           <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 animate-fade-in-up">
             {err}
           </div>
         )}
-
 
         {/* Result count */}
         <div className="flex items-center justify-between">
@@ -692,14 +681,14 @@ export default function WardenStudents() {
           </p>
         </div>
 
-
         {/* Table */}
         <div className="table-wrap overflow-x-auto">
-          <table className="data min-w-[950px]">
+          <table className="data min-w-[1050px]">
             <thead>
               <tr>
                 <th>Student</th>
                 <th>Roll No</th>
+                <th>Hostel</th>
                 <th>Room</th>
                 <th>Course</th>
                 <th>Status</th>
@@ -708,14 +697,12 @@ export default function WardenStudents() {
               </tr>
             </thead>
 
-
             <tbody>
               {filteredStudents.map((student, i) => {
                 const studentId = getStudentId(student);
                 const currentRoomId = getStudentRoomId(student);
                 const isAllocating = allocationId === studentId;
                 const status = getStatus(student);
-
 
                 return (
                   <tr
@@ -732,9 +719,9 @@ export default function WardenStudents() {
                       )}
                     </td>
 
-
                     <td>{student.roll_number || student.rollNumber || '—'}</td>
 
+                    <td className="text-xs text-gray-600">{student.hostel_name || '—'}</td>
 
                     <td>
                       <select
@@ -745,14 +732,12 @@ export default function WardenStudents() {
                       >
                         <option value="">Unassigned</option>
 
-
                         {rooms.map((room) => {
                           const roomId = getRoomId(room);
                           const occupied = getRoomOccupied(room);
                           const capacity = getRoomCapacity(room);
                           const isCurrentRoom = roomId === currentRoomId;
                           const isFull = capacity > 0 && occupied >= capacity && !isCurrentRoom;
-
 
                           return (
                             <option key={roomId} value={roomId} disabled={isFull}>
@@ -764,23 +749,18 @@ export default function WardenStudents() {
                         })}
                       </select>
 
-
                       {isAllocating && (
                         <p className="mt-1 text-xs text-gray-400 animate-pulse">Updating room...</p>
                       )}
                     </td>
 
-
                     <td>{student.course || '—'}</td>
-
 
                     <td>
                       <Badge color={getStatusColor(status)}>{status}</Badge>
                     </td>
 
-
                     <td className="text-xs text-gray-500">{student.phone || '—'}</td>
-
 
                     <td className="whitespace-nowrap text-right">
                       {status === 'Active' && (
@@ -797,10 +777,9 @@ export default function WardenStudents() {
                 );
               })}
 
-
               {filteredStudents.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-400">
+                  <td colSpan={8} className="py-8 text-center text-gray-400">
                     No students found for the selected filters.
                   </td>
                 </tr>
@@ -809,7 +788,6 @@ export default function WardenStudents() {
           </table>
         </div>
       </div>
-
 
       {/* Add student modal (warden: add only, no edit/delete) */}
       <Modal 
@@ -834,7 +812,6 @@ export default function WardenStudents() {
               <input type="file" accept="image/*" onChange={handleImage} />
             </div>
           </div>
-
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -900,7 +877,6 @@ export default function WardenStudents() {
                   const capacity = getRoomCapacity(room);
                   const isFull = capacity > 0 && occupied >= capacity;
 
-
                   return (
                     <option key={roomId} value={roomId} disabled={isFull}>
                       {getRoomBlock(room) ? `${getRoomBlock(room)} - ` : ''}
@@ -913,15 +889,12 @@ export default function WardenStudents() {
             </div>
           </div>
 
-
           <div>
             <label className="label">Address</label>
             <textarea name="address" className="input" rows={2} value={form.address} onChange={handleInputChange} />
           </div>
 
-
           {formErr && <p className="text-sm text-red-600 animate-slide-down">{formErr}</p>}
-
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-outline" onClick={() => setModalOpen(false)}>
@@ -934,7 +907,6 @@ export default function WardenStudents() {
           </div>
         </form>
       </Modal>
-
 
       {/* Bulk import modal */}
       <Modal 
@@ -960,7 +932,6 @@ export default function WardenStudents() {
             </button>
           </div>
 
-
           <div>
             <label className="label">Excel file (.xlsx)</label>
             <input
@@ -976,9 +947,7 @@ export default function WardenStudents() {
             )}
           </div>
 
-
           {importErr && <p className="text-sm text-red-600 animate-slide-down">{importErr}</p>}
-
 
           {importResults && (
             <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-100">
@@ -1008,7 +977,6 @@ export default function WardenStudents() {
               </ul>
             </div>
           )}
-
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-outline" onClick={() => setImportOpen(false)}>
