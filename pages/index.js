@@ -13,7 +13,7 @@ export default function Home() {
         else if (role === "warden") router.replace("/warden");
         else router.replace("/student");
       })
-      .catch(() => router.replace("/login"));
+      .catch(() => router.replace("/warden/login"));
   }, []);
 
   return (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 
 export default function AdminLogin() {
   const router = useRouter();
@@ -62,7 +63,13 @@ export default function AdminLogin() {
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
+         <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+          <Link href="/warden/login" className="text-sm text-gray-500 hover:text-gray-700">
+            Warden Login
+          </Link>
+        </div>
       </div>
+      
     </div>
   );
 }

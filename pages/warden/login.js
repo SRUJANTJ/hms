@@ -65,8 +65,8 @@ export default function WardenLogin() {
         </form>
 
         <div className="mt-6 pt-5 border-t border-gray-100 text-center">
-          <Link href="/login" className="text-sm text-gray-500 hover:text-gray-700">
-            &larr; Back to Student Login
+          <Link href="/admin/login" className="text-sm text-gray-500 hover:text-gray-700">
+            Admin Login
           </Link>
         </div>
       </div>
