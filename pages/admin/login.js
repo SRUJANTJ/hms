@@ -56,7 +56,12 @@ export default function AdminLogin() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+  <span> 
+            admin@hostel.com<br />
+            Admin@123
 
+
+          </span>
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button type="submit" disabled={loading} className="btn bg-gray-900 text-white hover:bg-gray-800 w-full">

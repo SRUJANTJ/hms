@@ -21,7 +21,7 @@ export default function StudentLogin() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
-      router.push("/warden");
+      router.push("/student");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -58,6 +58,13 @@ export default function StudentLogin() {
               placeholder="••••••••"
             />
           </div>
+          <br />
+          <span>
+            test@mail.com <br />
+            123
+
+
+          </span>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

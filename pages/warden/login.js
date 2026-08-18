@@ -56,7 +56,12 @@ export default function WardenLogin() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+  <span>
+            hotom32305@primetor.com<br />
+            123
 
+
+          </span>
           {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button type="submit" disabled={loading} className="btn bg-emerald-600 text-white hover:bg-emerald-700 w-full">
