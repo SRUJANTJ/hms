@@ -21,7 +21,7 @@ export default function StudentLogin() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
-      router.push("/student");
+      router.push("/warden");
     } catch (err) {
       setError(err.message);
     } finally {
