@@ -3,9 +3,11 @@ import PortalLayout from "@/components/PortalLayout";
 import { WARDEN_LINKS } from "@/components/navLinks";
 import { Badge, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 export default function WardenComplaints() {
   const { user, loading } = useAuthGuard(["warden"], "/warden/login");
+  const toast = useToast();
   const [complaints, setComplaints] = useState([]);
   const [filter, setFilter] = useState("All");
   const [err, setErr] = useState("");
@@ -16,8 +18,13 @@ export default function WardenComplaints() {
   if (loading || !user) return <FullscreenLoader />;
 
   async function updateStatus(c, status) {
-    await apiFetch(`/api/admin/complaints/${c.id}`, { method: "PUT", body: JSON.stringify({ status }) });
-    await load();
+    try {
+      await apiFetch(`/api/admin/complaints/${c.id}`, { method: "PUT", body: JSON.stringify({ status }) });
+      toast.success(`Complaint marked ${status}`);
+      await load();
+    } catch (e) {
+      toast.error(e.message || "Failed to update complaint");
+    }
   }
 
   const filtered = filter === "All" ? complaints : complaints.filter((c) => c.status === filter);

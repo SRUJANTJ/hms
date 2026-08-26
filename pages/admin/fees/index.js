@@ -3,6 +3,7 @@ import PortalLayout from "@/components/PortalLayout";
 import { ADMIN_LINKS } from "@/components/navLinks";
 import { Modal, Badge, Spinner, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 import { downloadFeesTemplate, parseFeesFile, exportFeesToExcel } from "@/lib/excel";
 import {
   FileDown,
@@ -15,6 +16,7 @@ import {
 
 export default function AdminFees() {
   const { user, loading } = useAuthGuard(["admin"], "/admin/login");
+  const toast = useToast();
   const [fees, setFees] = useState([]);
   const [students, setStudents] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -56,23 +58,35 @@ export default function AdminFees() {
       await apiFetch("/api/admin/fees", { method: "POST", body: JSON.stringify(form) });
       setModalOpen(false);
       setForm({ student_id: "", fee_type: "Monthly Rent", amount: "", due_date: "", remarks: "" });
+      toast.success("Fee record added");
       await load();
     } catch (e2) {
       setErr(e2.message);
+      toast.error(e2.message || "Failed to save fee record");
     } finally {
       setSaving(false);
     }
   }
 
   async function markPaid(f) {
-    await apiFetch(`/api/admin/fees/${f.id}`, { method: "PUT", body: JSON.stringify({ status: "Paid" }) });
-    await load();
+    try {
+      await apiFetch(`/api/admin/fees/${f.id}`, { method: "PUT", body: JSON.stringify({ status: "Paid" }) });
+      toast.success("Marked as paid");
+      await load();
+    } catch (e) {
+      toast.error(e.message || "Failed to update fee");
+    }
   }
 
   async function deleteFee(id) {
     if (!confirm("Delete this fee record?")) return;
-    await apiFetch(`/api/admin/fees/${id}`, { method: "DELETE" });
-    await load();
+    try {
+      await apiFetch(`/api/admin/fees/${id}`, { method: "DELETE" });
+      toast.success("Fee record deleted");
+      await load();
+    } catch (e) {
+      toast.error(e.message || "Failed to delete fee record");
+    }
   }
 
   const filtered = filter === "All" ? fees : fees.filter((f) => f.status === filter);
@@ -128,10 +142,12 @@ export default function AdminFees() {
       });
 
       setImportResults(response);
+      toast.success(`Bulk update finished: ${response.successCount || 0} processed`);
       await load();
     } catch (error) {
       console.error("Error importing fees:", error);
       setImportErr(error.message || "Import failed");
+      toast.error(error.message || "Import failed");
     } finally {
       setImporting(false);
     }

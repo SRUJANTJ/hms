@@ -3,9 +3,11 @@ import PortalLayout from "@/components/PortalLayout";
 import { WARDEN_LINKS } from "@/components/navLinks";
 import { Badge, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 export default function WardenNotifications() {
   const { user, loading } = useAuthGuard(["warden"], "/warden/login");
+  const toast = useToast();
   const [list, setList] = useState([]);
   const [form, setForm] = useState({ title: "", message: "", audience: "Students" });
   const [err, setErr] = useState("");
@@ -23,8 +25,9 @@ export default function WardenNotifications() {
     try {
       await apiFetch("/api/admin/notifications", { method: "POST", body: JSON.stringify(form) });
       setForm({ title: "", message: "", audience: "Students" });
+      toast.success("Announcement published");
       await load();
-    } catch (e2) { setErr(e2.message); } finally { setSending(false); }
+    } catch (e2) { setErr(e2.message); toast.error(e2.message || "Failed to publish"); } finally { setSending(false); }
   }
 
   return (

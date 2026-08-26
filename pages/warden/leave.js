@@ -3,6 +3,7 @@ import PortalLayout from '@/components/PortalLayout';
 import { WARDEN_LINKS } from '@/components/navLinks';
 import { Badge, FullscreenLoader } from '@/components/ui';
 import { useAuthGuard, apiFetch } from '@/lib/useAuthGuard';
+import { useToast } from '@/components/Toast';
 
 const LEAVE_STATUSES = [
   'Pending',
@@ -15,6 +16,7 @@ export default function WardenLeave() {
     ['warden'],
     '/warden/login'
   );
+  const toast = useToast();
 
   const [leaves, setLeaves] = useState([]);
   const [search, setSearch] = useState('');
@@ -328,11 +330,13 @@ export default function WardenLeave() {
             : item
         )
       );
+      toast.success(`Leave request ${status.toLowerCase()}`);
     } catch (error) {
       console.error('Error reviewing leave request:', error);
       setErr(
         error.message || 'Failed to update leave request'
       );
+      toast.error(error.message || 'Failed to update leave request');
     } finally {
       setReviewingId(null);
     }

@@ -3,9 +3,11 @@ import PortalLayout from "@/components/PortalLayout";
 import { ADMIN_LINKS } from "@/components/navLinks";
 import { Badge, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 export default function AdminNotifications() {
   const { user, loading } = useAuthGuard(["admin"], "/admin/login");
+  const toast = useToast();
   const [list, setList] = useState([]);
   const [form, setForm] = useState({ title: "", message: "", audience: "All" });
   const [err, setErr] = useState("");
@@ -26,8 +28,9 @@ export default function AdminNotifications() {
     try {
       await apiFetch("/api/admin/notifications", { method: "POST", body: JSON.stringify(form) });
       setForm({ title: "", message: "", audience: "All" });
+      toast.success("Announcement published");
       await load();
-    } catch (e2) { setErr(e2.message); } finally { setSending(false); }
+    } catch (e2) { setErr(e2.message); toast.error(e2.message || "Failed to publish"); } finally { setSending(false); }
   }
 
   return (

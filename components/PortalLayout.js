@@ -13,6 +13,7 @@ import {
   Bell,
   UserCircle,
   Circle,
+  Database,
 } from 'lucide-react';
 
 const NAV_ICONS = {
@@ -27,6 +28,7 @@ const NAV_ICONS = {
   'Staff & Wardens': UserCog,
   Notifications: Bell,
   'My Profile': UserCircle,
+  'Master Access': Database,
 };
 
 const THEMES = {
@@ -47,85 +49,25 @@ const THEMES = {
   },
 };
 
-export default function PortalLayout({
-  role,
-  user,
-  links = [],
-  title,
-  children,
-}) {
-  const router = useRouter();
+/*
+  Hoisted OUTSIDE PortalLayout on purpose.
 
-  const theme = THEMES[role] || THEMES.admin;
+  This used to be defined as `const SidebarContent = () => (...)`
+  inside PortalLayout's function body. That meant a brand-new
+  component function was created on every single render of
+  PortalLayout. React treats "a different function" as "a different
+  component type", so whenever the parent re-rendered - e.g. because
+  you typed a character into a search box on the page, which updates
+  that page's state, which re-renders PortalLayout because `children`
+  changed - React would unmount the *entire* previous sidebar and
+  mount a fresh one from scratch. That's what caused the whole
+  sidebar to "reload"/flicker on every keystroke.
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const loginPath =
-    role === 'admin'
-      ? '/admin/login'
-      : role === 'warden'
-        ? '/warden/login'
-        : '/login';
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
-  };
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen((current) => !current);
-  };
-
-  const handleLogout = async () => {
-    if (isLoggingOut) return;
-
-    setIsLoggingOut(true);
-
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      closeMobileMenu();
-      router.push(loginPath);
-    }
-  };
-
-  /*
-    Close the mobile menu by pressing Escape.
-  */
-  useEffect(() => {
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        closeMobileMenu();
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, []);
-
-  /*
-    Prevent background page scrolling when mobile menu is open.
-  */
-  useEffect(() => {
-    if (mobileMenuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [mobileMenuOpen]);
-
-  const SidebarContent = ({ mobile = false }) => (
+  Keeping it as a top-level, stable component fixes that: React can
+  now correctly diff/update it instead of tearing it down each time.
+*/
+function Sidebar({ mobile = false, role, theme, links, router, user, closeMobileMenu, handleLogout, isLoggingOut }) {
+  return (
     <div className="flex h-full flex-col">
       <div className="flex items-start justify-between border-b border-white/10 px-5 py-5">
         <div>
@@ -227,6 +169,87 @@ export default function PortalLayout({
       </div>
     </div>
   );
+}
+
+export default function PortalLayout({
+  role,
+  user,
+  links = [],
+  title,
+  children,
+}) {
+  const router = useRouter();
+
+  const theme = THEMES[role] || THEMES.admin;
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const loginPath =
+    role === 'admin'
+      ? '/admin/login'
+      : role === 'warden'
+        ? '/warden/login'
+        : '/login';
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen((current) => !current);
+  };
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      closeMobileMenu();
+      router.push(loginPath);
+    }
+  };
+
+  /*
+    Close the mobile menu by pressing Escape.
+  */
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        closeMobileMenu();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  /*
+    Prevent background page scrolling when mobile menu is open.
+  */
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [mobileMenuOpen]);
+
+  const sidebarProps = { role, theme, links, router, user, closeMobileMenu, handleLogout, isLoggingOut };
 
   return (
     <div className="min-h-screen bg-[#f4f5fb]">
@@ -234,7 +257,7 @@ export default function PortalLayout({
       <aside
         className={`fixed inset-y-0 left-0 z-40 hidden w-60 shrink-0 text-white md:flex ${theme.bar}`}
       >
-        <SidebarContent />
+        <Sidebar {...sidebarProps} />
       </aside>
 
       {/* Mobile overlay */}
@@ -255,7 +278,7 @@ export default function PortalLayout({
             : '-translate-x-full'
         } ${theme.bar}`}
       >
-        <SidebarContent mobile />
+        <Sidebar mobile {...sidebarProps} />
       </aside>
 
       {/* Main content */}

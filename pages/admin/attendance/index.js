@@ -3,11 +3,13 @@ import PortalLayout from "@/components/PortalLayout";
 import { ADMIN_LINKS } from "@/components/navLinks";
 import { Badge, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function AdminAttendance() {
   const { user, loading } = useAuthGuard(["admin"], "/admin/login");
+  const toast = useToast();
   const [date, setDate] = useState(today());
   const [list, setList] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -34,7 +36,8 @@ export default function AdminAttendance() {
         method: "POST",
         body: JSON.stringify({ date, records: list.map((r) => ({ student_id: r.student_id, status: r.status })) }),
       });
-    } catch (e2) { setErr(e2.message); } finally { setSaving(false); }
+      toast.success("Attendance saved");
+    } catch (e2) { setErr(e2.message); toast.error(e2.message || "Failed to save attendance"); } finally { setSaving(false); }
   }
 
   return (

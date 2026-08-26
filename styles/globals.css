@@ -7,7 +7,7 @@ body {
 }
 
 .card {
-  @apply bg-white rounded-xl shadow-sm border border-gray-100 p-5;
+  @apply bg-white rounded-xl shadow-sm border border-gray-200 p-5;
 }
 
 .btn {
@@ -35,19 +35,29 @@ body {
 }
 
 .table-wrap {
-  @apply overflow-x-auto card p-0;
+  @apply overflow-x-auto card p-0 border border-gray-200;
 }
 
 table.data {
-  @apply w-full text-sm;
+  @apply w-full text-sm border-collapse;
 }
 
 table.data th {
-  @apply text-left px-4 py-3 bg-gray-50 text-gray-500 font-semibold uppercase text-xs;
+  @apply text-left px-4 py-3 bg-gray-50 text-gray-500 font-semibold uppercase text-xs border-b border-gray-200;
 }
 
 table.data td {
-  @apply px-4 py-3 border-t border-gray-100;
+  @apply px-4 py-3 border-t border-gray-200;
+}
+
+table.data th,
+table.data td {
+  @apply border-r border-gray-100;
+}
+
+table.data th:last-child,
+table.data td:last-child {
+  @apply border-r-0;
 }
 
 .badge {

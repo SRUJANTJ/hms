@@ -3,9 +3,11 @@ import PortalLayout from "@/components/PortalLayout";
 import { ADMIN_LINKS } from "@/components/navLinks";
 import { Badge, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 export default function AdminComplaints() {
   const { user, loading } = useAuthGuard(["admin"], "/admin/login");
+  const toast = useToast();
   const [complaints, setComplaints] = useState([]);
   const [staff, setStaff] = useState([]);
   const [filter, setFilter] = useState("All");
@@ -22,13 +24,23 @@ export default function AdminComplaints() {
   if (loading || !user) return <FullscreenLoader />;
 
   async function updateStatus(c, status) {
-    await apiFetch(`/api/admin/complaints/${c.id}`, { method: "PUT", body: JSON.stringify({ status }) });
-    await load();
+    try {
+      await apiFetch(`/api/admin/complaints/${c.id}`, { method: "PUT", body: JSON.stringify({ status }) });
+      toast.success(`Complaint marked ${status}`);
+      await load();
+    } catch (e) {
+      toast.error(e.message || "Failed to update complaint");
+    }
   }
 
   async function assign(c, assigned_to) {
-    await apiFetch(`/api/admin/complaints/${c.id}`, { method: "PUT", body: JSON.stringify({ assigned_to: assigned_to || null }) });
-    await load();
+    try {
+      await apiFetch(`/api/admin/complaints/${c.id}`, { method: "PUT", body: JSON.stringify({ assigned_to: assigned_to || null }) });
+      toast.success("Complaint assigned");
+      await load();
+    } catch (e) {
+      toast.error(e.message || "Failed to assign complaint");
+    }
   }
 
   const filtered = filter === "All" ? complaints : complaints.filter((c) => c.status === filter);

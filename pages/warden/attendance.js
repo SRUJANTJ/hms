@@ -3,6 +3,7 @@ import PortalLayout from '@/components/PortalLayout';
 import { WARDEN_LINKS } from '@/components/navLinks';
 import { FullscreenLoader } from '@/components/ui';
 import { useAuthGuard, apiFetch } from '@/lib/useAuthGuard';
+import { useToast } from '@/components/Toast';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -13,6 +14,7 @@ export default function WardenAttendance() {
     ['warden'],
     '/warden/login'
   );
+  const toast = useToast();
 
   const [date, setDate] = useState(today());
   const [list, setList] = useState([]);
@@ -341,11 +343,13 @@ export default function WardenAttendance() {
       setSuccessMessage(
         `Attendance saved successfully for ${date}.`
       );
+      toast.success('Attendance saved');
 
       setSelectedIds(new Set());
     } catch (error) {
       console.error('Error saving attendance:', error);
       setErr(error.message || 'Failed to save attendance');
+      toast.error(error.message || 'Failed to save attendance');
     } finally {
       setSaving(false);
     }

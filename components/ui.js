@@ -157,20 +157,39 @@ export function ProgressBar({ value = 0, max = 100, color = "primary", label }) 
   );
 }
 
-export function Modal({ open, onClose, title, children, wide }) {
+export function Modal({ open, onClose, title, children, wide, className = "", overlayClassName = "" }) {
+  useEffect(() => {
+    if (!open) return undefined;
+
+    // Lock background scroll while the popup is open.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
+
   return (
     <div
-      className="fixed  top-60 inset-0 z-50 flex items-center justify-center  px-4 animate-fade-in"
+      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-10 animate-fade-in bg-black/40 ${overlayClassName}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose?.();
       }}
     >
       <div
-        className={`bg-white rounded-xl shadow-xl w-full ${wide ? "max-w-2xl" : "max-w-md"} max-h-[90vh] flex flex-col animate-scale-in`}
+        className={`bg-white rounded-xl shadow-xl border border-gray-200 w-full mt-0 ${wide ? "max-w-2xl" : "max-w-md"} my-auto max-h-[85vh] flex flex-col animate-scale-in ${className}`}
       >
         {/* Header: shrink-0 keeps it pinned at the top, never scrolls away */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0 rounded-t-xl bg-white">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0 rounded-t-xl bg-white">
           <h3 className="font-semibold text-gray-800">{title}</h3>
           <button
             onClick={onClose}
@@ -181,12 +200,16 @@ export function Modal({ open, onClose, title, children, wide }) {
         </div>
 
         {/* Body: this is the only part that scrolls now.
-            min-h-0 is required for overflow to work correctly inside a flex column. */}
-        <div className="p-5 overflow-y-auto min-h-0">{children}</div>
+            flex-1 lets it grow/shrink to fill leftover height, and
+            min-h-0 overrides flexbox's default min-height:auto (which
+            otherwise refuses to shrink a flex item below its content
+            size and silently breaks overflow-y-auto). */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );
 }
+
 export function Badge({ children, color = "gray" }) {
   const colors = {
     gray: "bg-gray-100 text-gray-600",

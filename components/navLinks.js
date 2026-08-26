@@ -8,6 +8,7 @@ export const ADMIN_LINKS = [
   { href: "/admin/leave", label: "Leave Requests" },
   { href: "/admin/staff", label: "Staff & Wardens" },
   { href: "/admin/notifications", label: "Notifications" },
+  { href: "/admin/master", label: "Master Access" },
 ];
 
 export const WARDEN_LINKS = [

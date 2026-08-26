@@ -1,20 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PortalLayout from '@/components/PortalLayout';
 import { WARDEN_LINKS } from '@/components/navLinks';
 import { Badge, Modal, Spinner, fileToBase64, FullscreenLoader } from '@/components/ui';
 import { useAuthGuard, apiFetch } from '@/lib/useAuthGuard';
+import { useToast } from '@/components/Toast';
 import {
-  downloadStudentsTemplate,
-  parseStudentsFile,
-  exportStudentsToExcel,
-} from '@/lib/excel';
-import {
-  FileDown,
-  FileUp,
-  FileSpreadsheet,
   UserPlus,
-  CheckCircle2,
-  XCircle,
   Building2,
 } from 'lucide-react';
 
@@ -38,6 +29,7 @@ const emptyForm = {
 
 export default function WardenStudents() {
   const { user, loading } = useAuthGuard(['warden'], '/warden/login');
+  const toast = useToast();
 
   const [students, setStudents] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -58,15 +50,6 @@ export default function WardenStudents() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formErr, setFormErr] = useState('');
-
-  // Bulk excel import
-  const [importOpen, setImportOpen] = useState(false);
-  const [importRows, setImportRows] = useState([]);
-  const [importFileName, setImportFileName] = useState('');
-  const [importing, setImporting] = useState(false);
-  const [importResults, setImportResults] = useState(null);
-  const [importErr, setImportErr] = useState('');
-  const fileInputRef = useRef(null);
 
   const fetchAll = async (scopeOverride) => {
     try {
@@ -305,10 +288,12 @@ export default function WardenStudents() {
       });
 
       setModalOpen(false);
+      toast.success('Student added successfully');
       await fetchAll();
     } catch (error) {
       console.error('Error adding student:', error);
       setFormErr(error.message || 'Failed to add student');
+      toast.error(error.message || 'Failed to add student');
     } finally {
       setSaving(false);
     }
@@ -351,11 +336,13 @@ export default function WardenStudents() {
         });
       }
 
+      toast.success('Room updated');
       await fetchAll();
     } catch (error) {
       console.error('Error allocating room:', error);
       setStudents(previousStudents);
       setErr(error.message || 'Failed to update room');
+      toast.error(error.message || 'Failed to update room');
     } finally {
       setAllocationId(null);
     }
@@ -376,72 +363,15 @@ export default function WardenStudents() {
         body: JSON.stringify({ checkout: true, room_id: null }),
       });
 
+      toast.success('Student checked out');
       await fetchAll();
     } catch (error) {
       console.error('Error checking out student:', error);
       setErr(error.message || 'Failed to check out student');
+      toast.error(error.message || 'Failed to check out student');
     } finally {
       setAllocationId(null);
     }
-  };
-
-  /* ---------------- Bulk excel import / export ---------------- */
-
-  const openImport = () => {
-    setImportRows([]);
-    setImportResults(null);
-    setImportErr('');
-    setImportFileName('');
-    setImportOpen(true);
-  };
-
-  const handleImportFileChange = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setImportErr('');
-    setImportResults(null);
-    setImportFileName(file.name);
-
-    try {
-      const rows = await parseStudentsFile(file);
-      if (rows.length === 0) {
-        setImportErr('No rows found in that file.');
-        setImportRows([]);
-        return;
-      }
-      setImportRows(rows);
-    } catch (error) {
-      console.error('Error parsing file:', error);
-      setImportErr('Could not read that file. Please use the provided template.');
-      setImportRows([]);
-    }
-  };
-
-  const runImport = async () => {
-    if (importRows.length === 0) return;
-
-    setImporting(true);
-    setImportErr('');
-
-    try {
-      const response = await apiFetch('/api/admin/students/bulk-import', {
-        method: 'POST',
-        body: JSON.stringify({ rows: importRows }),
-      });
-
-      setImportResults(response);
-      await fetchAll();
-    } catch (error) {
-      console.error('Error importing students:', error);
-      setImportErr(error.message || 'Import failed');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const handleExport = () => {
-    exportStudentsToExcel(filteredStudents, 'warden_students_export.xlsx');
   };
 
   const getStatusColor = (status) => {
@@ -474,22 +404,6 @@ export default function WardenStudents() {
               className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refreshing ? 'Refreshing...' : 'Refresh'}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              <FileDown size={16} /> Export
-            </button>
-
-            <button
-              type="button"
-              onClick={openImport}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-            >
-              <FileUp size={16} /> Import
             </button>
 
             <button
@@ -790,13 +704,11 @@ export default function WardenStudents() {
       </div>
 
       {/* Add student modal (warden: add only, no edit/delete) */}
-      <Modal 
-        open={modalOpen} 
-        onClose={() => setModalOpen(false)} 
-        title="Add Student" 
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Add Student"
         wide
-        className="z-[9999]"
-        overlayClassName="z-[9999]"
       >
         <form onSubmit={handleSave} className="space-y-4">
           <div className="flex items-center gap-4">
@@ -906,93 +818,6 @@ export default function WardenStudents() {
             </button>
           </div>
         </form>
-      </Modal>
-
-      {/* Bulk import modal */}
-      <Modal 
-        open={importOpen} 
-        onClose={() => setImportOpen(false)} 
-        title="Bulk Import Students" 
-        wide
-        className="z-[9999]"
-        overlayClassName="z-[9999]"
-      >
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <FileSpreadsheet size={18} className="text-primary-600" />
-              Need the column layout? Download the sample first.
-            </div>
-            <button
-              type="button"
-              onClick={downloadStudentsTemplate}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-gray-100"
-            >
-              <FileDown size={14} /> Download template
-            </button>
-          </div>
-
-          <div>
-            <label className="label">Excel file (.xlsx)</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleImportFileChange}
-            />
-            {importFileName && (
-              <p className="mt-1 text-xs text-gray-400">
-                {importRows.length} row{importRows.length === 1 ? '' : 's'} detected in {importFileName}
-              </p>
-            )}
-          </div>
-
-          {importErr && <p className="text-sm text-red-600 animate-slide-down">{importErr}</p>}
-
-          {importResults && (
-            <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-100">
-              <div className="flex items-center gap-4 border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs font-medium text-gray-600">
-                <span className="inline-flex items-center gap-1 text-emerald-600">
-                  <CheckCircle2 size={14} /> {importResults.createdCount} created
-                </span>
-                {importResults.failedCount > 0 && (
-                  <span className="inline-flex items-center gap-1 text-red-600">
-                    <XCircle size={14} /> {importResults.failedCount} failed
-                  </span>
-                )}
-              </div>
-              <ul className="divide-y divide-gray-100 text-xs">
-                {importResults.results.map((r) => (
-                  <li key={r.row} className="flex items-center justify-between gap-2 px-4 py-2">
-                    <span className="text-gray-600 truncate">
-                      Row {r.row} — {r.name || r.email || 'Unnamed'}
-                    </span>
-                    {r.success ? (
-                      <span className="text-emerald-600">Added</span>
-                    ) : (
-                      <span className="text-red-600">{r.error}</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="btn-outline" onClick={() => setImportOpen(false)}>
-              Close
-            </button>
-            <button
-              type="button"
-              disabled={importRows.length === 0 || importing}
-              onClick={runImport}
-              className="btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {importing && <Spinner />}
-              {importing ? 'Importing...' : `Import ${importRows.length || ''} row${importRows.length === 1 ? '' : 's'}`}
-            </button>
-          </div>
-        </div>
       </Modal>
     </PortalLayout>
   );

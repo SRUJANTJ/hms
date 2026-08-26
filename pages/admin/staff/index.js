@@ -3,6 +3,7 @@ import PortalLayout from "@/components/PortalLayout";
 import { ADMIN_LINKS } from "@/components/navLinks";
 import { Modal, Badge, fileToBase64, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 const emptyForm = {
   name: "",
@@ -18,6 +19,7 @@ const emptyForm = {
 
 export default function AdminStaff() {
   const { user, loading } = useAuthGuard(["admin"], "/admin/login");
+  const toast = useToast();
   const [staff, setStaff] = useState([]);
   const [hostels, setHostels] = useState([]); // new
   const [modalOpen, setModalOpen] = useState(false);
@@ -107,26 +109,38 @@ export default function AdminStaff() {
       setModalOpen(false);
       setForm(emptyForm);
       setEditing(null);
+      toast.success(editing ? "Staff member updated" : "Staff member added");
       await load();
     } catch (e2) {
       setErr(e2.message);
+      toast.error(e2.message || "Failed to save staff member");
     } finally {
       setSaving(false);
     }
   }
 
   async function toggleActive(s) {
-    await apiFetch(`/api/admin/staff/${s.id}`, {
-      method: "PUT",
-      body: JSON.stringify({ is_active: !s.is_active }),
-    });
-    await load();
+    try {
+      await apiFetch(`/api/admin/staff/${s.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ is_active: !s.is_active }),
+      });
+      toast.success(s.is_active ? "Staff member deactivated" : "Staff member activated");
+      await load();
+    } catch (e2) {
+      toast.error(e2.message || "Failed to update staff member");
+    }
   }
 
   async function remove(s) {
     if (!confirm(`Remove ${s.name}?`)) return;
-    await apiFetch(`/api/admin/staff/${s.id}`, { method: "DELETE" });
-    await load();
+    try {
+      await apiFetch(`/api/admin/staff/${s.id}`, { method: "DELETE" });
+      toast.success("Staff member removed");
+      await load();
+    } catch (e2) {
+      toast.error(e2.message || "Failed to remove staff member");
+    }
   }
 
   return (

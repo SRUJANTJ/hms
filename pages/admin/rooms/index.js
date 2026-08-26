@@ -3,9 +3,11 @@ import PortalLayout from "@/components/PortalLayout";
 import { ADMIN_LINKS } from "@/components/navLinks";
 import { Modal, Badge, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 export default function AdminRooms() {
   const { user, loading } = useAuthGuard(["admin"], "/admin/login");
+  const toast = useToast();
   const [rooms, setRooms] = useState([]);
   const [hostels, setHostels] = useState([]);
   const [tab, setTab] = useState("rooms");
@@ -92,9 +94,11 @@ export default function AdminRooms() {
         capacity: 2,
         monthly_rent: "",
       });
+      toast.success("Room added");
       await load();
     } catch (e2) {
       setErr(e2.message);
+      toast.error(e2.message || "Failed to save room");
     }
   }
 
@@ -108,9 +112,11 @@ export default function AdminRooms() {
       });
       setHostelModal(false);
       setHostelForm({ name: "", address: "", capacity: "", warden_id: "" });
+      toast.success("Hostel block added");
       await load();
     } catch (e2) {
       setErr(e2.message);
+      toast.error(e2.message || "Failed to save hostel block");
     }
   }
 
@@ -132,9 +138,11 @@ export default function AdminRooms() {
         }),
       });
       setEditRoomModal(false);
+      toast.success("Room updated");
       await load();
     } catch (e2) {
       setErr(e2.message);
+      toast.error(e2.message || "Failed to update room");
     }
   }
 
@@ -153,9 +161,11 @@ export default function AdminRooms() {
         }),
       });
       setEditHostelModal(false);
+      toast.success("Hostel block updated");
       await load();
     } catch (e2) {
       setErr(e2.message);
+      toast.error(e2.message || "Failed to update hostel block");
     }
   }
 
@@ -163,16 +173,22 @@ export default function AdminRooms() {
     if (!confirm("Delete this room?")) return;
     try {
       await apiFetch(`/api/admin/rooms/${id}`, { method: "DELETE" });
+      toast.success("Room deleted");
       await load();
     } catch (e2) {
-      alert(e2.message);
+      toast.error(e2.message || "Failed to delete room");
     }
   }
 
   async function deleteHostel(id) {
     if (!confirm("Delete this hostel block?")) return;
-    await apiFetch(`/api/admin/hostels/${id}`, { method: "DELETE" });
-    await load();
+    try {
+      await apiFetch(`/api/admin/hostels/${id}`, { method: "DELETE" });
+      toast.success("Hostel block deleted");
+      await load();
+    } catch (e2) {
+      toast.error(e2.message || "Failed to delete hostel block");
+    }
   }
 
   function openEditRoom(room) {

@@ -3,9 +3,11 @@ import PortalLayout from "@/components/PortalLayout";
 import { ADMIN_LINKS } from "@/components/navLinks";
 import { Badge, FullscreenLoader } from "@/components/ui";
 import { useAuthGuard, apiFetch } from "@/lib/useAuthGuard";
+import { useToast } from "@/components/Toast";
 
 export default function AdminLeave() {
   const { user, loading } = useAuthGuard(["admin"], "/admin/login");
+  const toast = useToast();
   const [leaves, setLeaves] = useState([]);
   const [err, setErr] = useState("");
 
@@ -18,8 +20,13 @@ export default function AdminLeave() {
   if (loading || !user) return <FullscreenLoader />;
 
   async function review(l, status) {
-    await apiFetch(`/api/admin/leave/${l.id}`, { method: "PUT", body: JSON.stringify({ status }) });
-    await load();
+    try {
+      await apiFetch(`/api/admin/leave/${l.id}`, { method: "PUT", body: JSON.stringify({ status }) });
+      toast.success(`Leave request ${status.toLowerCase()}`);
+      await load();
+    } catch (e) {
+      toast.error(e.message || "Failed to update leave request");
+    }
   }
 
   return (

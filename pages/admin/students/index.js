@@ -9,6 +9,7 @@ import {
   FullscreenLoader,
 } from '@/components/ui';
 import { useAuthGuard, apiFetch } from '@/lib/useAuthGuard';
+import { useToast } from '@/components/Toast';
 import {
   downloadStudentsTemplate,
   parseStudentsFile,
@@ -48,6 +49,7 @@ export default function AdminStudents() {
     ['admin'],
     '/admin/login'
   );
+  const toast = useToast();
 
   const [students, setStudents] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -524,10 +526,12 @@ setForm({
       }
 
       setModalOpen(false);
+      toast.success(editing ? 'Student updated' : 'Student added');
       await load();
     } catch (error) {
       console.error('Error saving student:', error);
       setErr(error.message || 'Failed to save student');
+      toast.error(error.message || 'Failed to save student');
     } finally {
       setSaving(false);
     }
@@ -554,10 +558,12 @@ setForm({
         method: 'DELETE',
       });
 
+      toast.success('Student deleted');
       await load();
     } catch (error) {
       console.error('Error deleting student:', error);
       setErr(error.message || 'Failed to delete student');
+      toast.error(error.message || 'Failed to delete student');
     }
   };
 
@@ -624,6 +630,7 @@ setForm({
         );
       }
 
+      toast.success('Room updated');
       await load();
     } catch (error) {
       console.error('Error allocating room:', error);
@@ -631,6 +638,7 @@ setForm({
       // Roll back UI if API request fails
       setStudents(previousStudents);
       setErr(error.message || 'Failed to update room');
+      toast.error(error.message || 'Failed to update room');
     } finally {
       setAllocationId(null);
     }
@@ -665,10 +673,12 @@ setForm({
         }
       );
 
+      toast.success('Student checked out');
       await load();
     } catch (error) {
       console.error('Error checking out student:', error);
       setErr(error.message || 'Failed to check out student');
+      toast.error(error.message || 'Failed to check out student');
     } finally {
       setAllocationId(null);
     }
@@ -729,10 +739,12 @@ setForm({
       });
 
       setImportResults(response);
+      toast.success(`Import finished: ${response.createdCount || 0} created`);
       await load();
     } catch (error) {
       console.error('Error importing students:', error);
       setImportErr(error.message || 'Import failed');
+      toast.error(error.message || 'Import failed');
     } finally {
       setImporting(false);
     }
