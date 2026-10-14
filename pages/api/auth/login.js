@@ -57,8 +57,7 @@ export default async function handler(req, res) {
     await clearLoginAttempts(identifier);
 
     const token = signToken({ id: user.id, role: user.role, name: user.name, email: user.email });
-    setAuthCookie(res, token);
-
+    setAuthCookie(res, token, user.role); // saves as hms_token_admin / _warden / _student
     return res.status(200).json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role, image: user.image },
     });

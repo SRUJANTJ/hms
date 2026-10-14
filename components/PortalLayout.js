@@ -190,7 +190,7 @@ export default function PortalLayout({
       ? '/admin/login'
       : role === 'warden'
         ? '/warden/login'
-        : '/login';
+        : '/student/login';
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false);
@@ -206,8 +206,11 @@ export default function PortalLayout({
     setIsLoggingOut(true);
 
     try {
+      // Logs out only this role; other roles stay signed in.
       await fetch('/api/auth/logout', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-hms-role': role },
+        body: JSON.stringify({ role }),
       });
     } catch (error) {
       console.error('Logout error:', error);

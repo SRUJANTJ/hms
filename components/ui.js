@@ -180,7 +180,7 @@ export function Modal({ open, onClose, title, children, wide, className = "", ov
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-10 animate-fade-in bg-black/40 ${overlayClassName}`}
+      className={`fixed inset-0 z-50 flex items-start justify-center  px-4 py-10 animate-fade-in bg-black/40 ${overlayClassName}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose?.();
       }}
